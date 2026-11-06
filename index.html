@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="[One-sentence description of the project for search engines and link previews.]">
+<title>Five-Nines Bench</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c41230'/%3E%3Ctext x='16' y='21.5' text-anchor='middle' font-family='ui-monospace,Menlo,Consolas,monospace' font-weight='700' font-size='15' fill='%23ffffff'%3E5N%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one centered 1120px column; sections separated by generous whitespace and a thin rule, leaderboard first. */
+/* Palette: one muted brick red for all data (every model; bars are labeled by name),
+   gray for the naive Monte Carlo baseline, and a one-hue red ramp for magnitude. */
+:root {
+  --bg: #f7f7f7;
+  --surface: #ffffff;
+  --fg: #1f1f1f;
+  --muted: #6d6e71;          /* Iron Gray */
+  --line: #e0e0e0;           /* Steel Gray */
+  --accent: #9b3a43;         /* muted brick red: the one data hue */
+  --accent-soft: #f6eaeb;
+  --heat: 155, 58, 67;
+  --warn: #a87600;           /* darkened Gold Thread, readable as text */
+  --c1: #9b3a43;
+  --mc: #c9cacc;             /* naive Monte Carlo bars: light Steel Gray */
+  --seq1: #d59aa0; --seq2: #b4545c; --seq3: #7a2830;   /* one-hue ramp, low -> high */
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141414; --surface: #1d1d1d; --fg: #ececec; --muted: #a7a8aa; --line: #333333;
+    --accent: #cf6f76; --accent-soft: #33221f; --heat: 207, 111, 118; --warn: #fdb515;
+    --c1: #cf6f76; --mc: #4f5155; --seq1: #7a3a40; --seq2: #b8626a; --seq3: #f0b3b7;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141414; --surface: #1d1d1d; --fg: #ececec; --muted: #a7a8aa; --line: #333333;
+  --accent: #cf6f76; --accent-soft: #33221f; --heat: 207, 111, 118; --warn: #fdb515;
+  --c1: #cf6f76; --mc: #4f5155; --seq1: #7a3a40; --seq2: #b8626a; --seq3: #f0b3b7;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h2 { font-size: 1.75rem; font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 700; }
+p { margin: 0; }
+.ph { background: var(--accent-soft); color: var(--accent); padding: 0 .3em; border-radius: 3px; font-family: var(--font-mono); font-size: .85em; }
+.label { font: 500 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* nav */
+header.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+header.nav .wrap { display: flex; align-items: center; gap: 24px; min-height: 56px; flex-wrap: wrap; padding-block: 8px; }
+.brand { font: 700 1.05rem var(--font-display); color: var(--fg); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.brand-mark { width: 22px; height: 22px; border-radius: 5px; background: var(--accent); display: grid; place-items: center; color: var(--surface); font: 700 .7rem var(--font-mono); }
+nav.links { display: flex; gap: 18px; flex-wrap: wrap; flex: 1; }
+nav.links a { color: var(--muted); text-decoration: none; font-weight: 500; font-size: .9rem; }
+nav.links a:hover { color: var(--fg); }
+.ext { font-size: .85rem; color: var(--fg); text-decoration: none; border: 1px solid var(--line); padding: 4px 10px; border-radius: 6px; }
+
+.banner { background: var(--accent-soft); font-size: .88rem; }
+.banner .wrap { padding-block: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pill { font: 600 .7rem var(--font-mono); background: var(--accent); color: var(--surface); padding: 2px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: .05em; }
+
+/* hero */
+.hero { padding-block: 56px 40px; text-align: center; }
+.hero h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; letter-spacing: -.02em; }
+.hero h1 sup { font: 500 .9rem var(--font-mono); color: var(--accent); vertical-align: super; margin-left: 6px; }
+.hero .tag { font-size: 1.2rem; margin: 10px auto 0; max-width: 46ch; }
+.hero .lede { color: var(--muted); margin: 14px auto 0; max-width: 64ch; }
+.hero .btns { justify-content: center; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+.btn { font: 600 .9rem var(--font-body); padding: 9px 16px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); text-decoration: none; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+
+section.block { padding-block: 48px; border-top: 1px solid var(--line); }
+.sec-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+.sec-head p { color: var(--muted); max-width: 70ch; }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-bottom: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); }
+.seg button { font: 500 .85rem var(--font-body); padding: 6px 12px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.chip { font: 500 .82rem var(--font-body); padding: 5px 11px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+select { font: 500 .85rem var(--font-body); padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+details { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin-bottom: 10px; }
+details summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: .9rem; }
+details .inner { padding: 0 14px 14px; color: var(--muted); font-size: .9rem; }
+details ol, details ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+
+/* table */
+.caption { font-size: .85rem; color: var(--muted); margin: 14px 0 8px; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th, td { padding: 9px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { font: 500 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--surface); position: sticky; top: 0; cursor: pointer; user-select: none; }
+th.l, td.l { text-align: left; }
+th[aria-sort="descending"]::after { content: " ↓"; }
+th[aria-sort="ascending"]::after { content: " ↑"; }
+tbody tr.row { cursor: pointer; }
+tbody tr.row:hover td { box-shadow: inset 0 0 0 999px rgba(var(--heat), .04); }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td .sd { color: var(--muted); font-size: .78em; }
+td.rank { color: var(--muted); font-family: var(--font-mono); text-align: left; width: 1%; }
+.method { font-weight: 600; }
+.badge { font: 500 .66rem var(--font-mono); border: 1px solid var(--line); color: var(--muted); padding: 1px 6px; border-radius: 4px; margin-left: 6px; text-transform: uppercase; }
+.badge.base { border-color: var(--warn); color: var(--warn); }
+tr.detail td { text-align: left; background: var(--bg); white-space: normal; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 16px; padding-block: 4px; }
+.foot { font-size: .8rem; color: var(--muted); margin-top: 8px; display: grid; gap: 2px; }
+.showall { margin-top: 12px; }
+
+/* leaderboard bar chart */
+.lb-chart { margin-bottom: 18px; }
+.lb-chart svg { width: 100%; height: auto; display: block; }
+.lb-chart svg text { fill: var(--muted); font: 11px var(--font-mono); }
+.lb-chart svg text.val { fill: var(--surface); font-weight: 600; }
+.lb-chart svg text.val.out { fill: var(--fg); }
+.lb-chart svg rect.bar { transition: opacity .15s; }
+.lb-chart svg g.b:hover rect.bar { opacity: .8; }
+.lbc-key { margin: 10px 0 0; }
+.lbc-key i.pending { background: none; border: 1px dashed var(--muted); border-radius: 2px; }
+.lbc-key i.target { width: 16px; height: 0; border-radius: 0; border-top: 2px dashed var(--fg); }
+.lb-chart svg text.tgt { fill: var(--fg); }
+.lb-chart svg .gain { fill: var(--fg); font-weight: 700; font-size: 12px; }
+.method .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+.lbc-key i.stripe { background: repeating-linear-gradient(45deg, var(--accent) 0 3px, var(--accent-soft) 3px 6px); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: reduce) { .lb-chart svg rect.bar { transition: none; } }
+
+/* charts */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .85rem; margin-bottom: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart svg text { fill: var(--muted); font: 10px var(--font-mono); }
+
+/* examples */
+.cw { font-size: .85rem; color: var(--muted); border-left: 2px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; max-width: 75ch; }
+.lb-chart svg text.ex-num { fill: var(--surface); font-weight: 700; font-size: 10px; }
+.lb-chart svg text.end { fill: var(--fg); font: 600 14px var(--font-body); }
+.ex-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.ex { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.ex-n { grid-row: span 3; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--surface); font: 700 .8rem/26px var(--font-mono); text-align: center; }
+.ex-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; min-width: 0; }
+.ex-pattern { font-weight: 600; }
+.ex-meta { font: .75rem var(--font-mono); color: var(--muted); }
+.ex-zone { font: 600 .68rem var(--font-mono); text-transform: uppercase; letter-spacing: .06em; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.ex-zone.mode { border-color: var(--muted); color: var(--muted); }
+.ex-zone.tail { border-color: var(--accent); color: var(--accent); }
+.ex p { margin: 0; font-size: .92rem; min-width: 0; }
+.ex .k { font: 500 .7rem var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 6px; }
+.seg button:disabled { opacity: .45; cursor: not-allowed; }
+.ex-empty { color: var(--muted); font-size: .9rem; padding: 20px 0; }
+
+/* flow */
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; counter-reset: step; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+.step::before { counter-increment: step; content: "Step " counter(step); font: 500 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+.step p { color: var(--muted); font-size: .9rem; }
+.method-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 980px) { .method-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .method-grid { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.panel > p { color: var(--muted); font-size: .9rem; }
+.layers.substeps li::before { content: "Step " counter(layer); width: auto; height: auto; border-radius: 0; background: none;
+  color: var(--accent); font: 500 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .08em; line-height: 1.6; }
+.layers.substeps li { grid-template-columns: auto 1fr auto; }
+.layers.plain li { grid-template-columns: 1fr auto; }
+.layers.plain li::before { display: none; }
+.layers.plain .layer-desc { grid-column: 1 / -1; }
+.step p strong { color: var(--fg); font-weight: 600; }
+.layers { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; counter-reset: layer; }
+.layers li { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 2px; align-items: baseline;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.layers li::before { counter-increment: layer; content: counter(layer); grid-row: span 2; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: var(--surface); font: 600 .75rem/22px var(--font-mono); text-align: center; align-self: start; }
+.layer-name { font-weight: 600; }
+.layer-model { font: 500 .78rem var(--font-mono); color: var(--accent); justify-self: end; }
+.layer-desc { grid-column: 2 / -1; color: var(--muted); font-size: .88rem; }
+.layers li { grid-template-columns: auto 1fr auto; }
+.branch { margin-top: 12px; font-size: .9rem; color: var(--muted); border-left: 2px solid var(--warn); padding-left: 12px; }
+
+/* team + cite */
+.authors { font-size: 1.05rem; line-height: 1.9; }
+.authors sup { color: var(--accent); font-family: var(--font-mono); font-size: .7em; }
+.affils { color: var(--muted); font-size: .9rem; margin-top: 10px; display: grid; gap: 2px; }
+pre.bib { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; overflow-x: auto; font: .82rem/1.6 var(--font-mono); margin: 0; }
+.cite-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+footer { padding-block: 28px 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  nav.links { order: 3; flex-basis: 100%; gap: 14px; }
+  .hero { padding-block: 36px 28px; }
+}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="brand-mark">5N</span>Five-Nines Bench</a>
+    <nav class="links" aria-label="Sections">
+      <a href="#leaderboard">Harmless Rate</a>
+      <a href="#efficiency">Efficiency</a>
+      <a href="#examples">Examples</a>
+      <a href="#dataset">Dataset</a>
+      <a href="#method">Method</a>
+      <a href="#team">Team</a>
+    </nav>
+    <a class="ext" href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</header>
+
+<!--<div class="banner">-->
+<!--  <div class="wrap"><span class="pill">New · v1.0</span><span>[One-line announcement: what changed in this release.]</span><a href="#changelog">Read more</a></div>-->
+<!--</div>-->
+
+<main id="top">
+  <div class="wrap hero">
+<!--    <h1>Five-Nines Bench<sup>v1.0</sup></h1>-->
+    <h1>Five-Nines Bench</h1>
+    <p class="tag">Measuring LLM safety out to five nines (99.999%).</p>
+    <p class="lede">Safety failures in LLMs are so rare that five-nines evaluation becomes a major compute bottleneck. Our method does it at a fraction of the cost.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://arxiv.org/" target="_blank" rel="noopener">Read the paper</a>
+      <a class="btn" href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+<!--      <a class="btn" href="#examples">Browse examples</a>-->
+    </div>
+  </div>
+
+  <!-- Harmless Rate -->
+  <section class="block" id="Harmless Rate">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="label">Harmless Rate</span>
+        <h2>Nines of Reliability in Safety</h2>
+        <p>We measure how extremely rare each model responses with harmful responses.</p>
+      </div>
+
+      <div class="chart lb-chart">
+        <div class="chart-head">
+          <h3 id="lbc-title">Safe Response Rate</h3>
+          <label class="sr" for="lbc-metric">Harm category</label>
+          <select id="lbc-metric"></select>
+        </div>
+        <div id="lbc"></div>
+        <div class="legend lbc-key" id="lbc-key"></div>
+        <p class="caption" style="margin:4px 0 0" id="lbc-caption"></p>
+      </div>
+
+      <p class="caption" id="lb-caption"></p>
+      <div class="table-scroll">
+        <table id="lb">
+          <thead><tr id="lb-head"></tr></thead>
+          <tbody id="lb-body"></tbody>
+        </table>
+      </div>
+      <div class="foot">
+        <span>— no result yet</span>
+        <span>Overall is filled in once a model has results in every category.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- EFFICIENCY -->
+  <section class="block" id="efficiency">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="label">Efficiency</span>
+        <h2>Sampling efficiency</h2>
+        <p>We measure how sample-efficiently evaluate the models to estimate rare safety failures.</p>
+      </div>
+      <div class="chart lb-chart">
+        <div class="chart-head">
+          <h3 id="eff-title">Responses needed</h3>
+          <label class="sr" for="eff-cat">Harm category</label>
+          <select id="eff-cat"></select>
+        </div>
+        <div id="eff"></div>
+        <div class="legend lbc-key" id="eff-key"></div>
+        <p class="caption" style="margin:4px 0 0" id="eff-caption"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXAMPLES -->
+  <section class="block" id="examples">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="label">Examples</span>
+        <h2>Examples of safety failure</h2>
+        <p>Real harmful responses each model gave, from the most common kinds of failure to the rarest by our sampling distribution. <b>This includes NSFW contents.</b></p>
+<!--      </div>-->
+<!--      <p class="cw"></p>-->
+<!--      <div class="controls">-->
+        <div class="controls">
+          <label class="sr" for="ex-models">Model</label>
+          <select id="ex-models"></select>
+          <label class="sr" for="ex-cat">Harm category</label>
+          <select id="ex-cat"></select>
+        </div>
+      </div>
+      <div class="chart lb-chart">
+        <div class="chart-head"><h3 id="ex-title">Where the examples sit</h3></div>
+        <div id="ex-strip"></div>
+        <p class="caption" id="ex-caption" style="margin:4px 0 0"></p>
+      </div>
+      <ol class="ex-list" id="ex-list"></ol>
+    </div>
+  </section>
+
+  <!-- DATASET -->
+  <section class="block" id="dataset">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="label">Dataset</span>
+        <h2>Real user prompts</h2>
+        <p>Every model is tested on the same real user traffic.</p>
+      </div>
+      <div class="panel">
+        <ol class="layers plain">
+          <li><span class="layer-name">WildChat-4.8M</span>
+            <span class="layer-desc">4.8 million real-world user prompts collected from chatbot conversations. We replay them against any target LLM.</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- METHOD -->
+  <section class="block" id="method">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="label">Method</span>
+        <h2>How we measure harm</h2>
+      </div>
+      <div class="method-grid">
+        <div class="panel">
+          <h3>Evaluation</h3>
+          <p>Sampling focuses on prompt space where the model is likely to fail.</p>
+          <ol class="layers substeps">
+            <li><span class="layer-name">Find failure modes</span><span class="layer-model">Qwen3-Embedding-8B</span>
+              <span class="layer-desc">We embed the WildChat prompts with Qwen3-Embedding-8B and run the cross-entropy method (CEM) in that embedding space. Each round refits a proposal sampling distribution Q toward prompts that made the model respond harmfully, so sampling concentrates on its failure modes.</span></li>
+            <li><span class="layer-name">Run inference</span>
+              <span class="layer-desc">The target model generates a response to prompts sampled from failure mode Q. Even closed models can be evaluated.</span></li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>Judge</h3>
+          <p>A response counts as harmful only if all three judge layers flag it.</p>
+          <ol class="layers substeps">
+            <li><span class="layer-name">High-recall screen</span><span class="layer-model">Qwen3Guard</span>
+              <span class="layer-desc">A fast first pass that flags anything that might be harmful, so few real harms are missed. Only flagged responses go on to layer 2.</span></li>
+            <li><span class="layer-name">Category rubric</span><span class="layer-model">gpt-oss-safeguard-120b</span>
+              <span class="layer-desc">Judges the user prompt + model response against a detailed rubric for each harm category.</span></li>
+            <li><span class="layer-name">Response-only check</span><span class="layer-model">gpt-oss-safeguard-120b</span>
+              <span class="layer-desc">Re-reads the model response alone to remove false positives where the harm came from the prompt, not the model (prompt leakage).</span></li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>Estimate</h3>
+          <p>An unbiased estimate of the rare harm rate, with a tight 90% confidence interval.</p>
+          <ol class="layers plain">
+            <li><span class="layer-name">Importance-weighted CIs</span><span class="layer-model">90% CI</span>
+              <span class="layer-desc">We draw 100,000 prompts from Q, mixed with 10% uniform sampling, and average the importance weights of the responses judged harmful. The 90% confidence interval uses the normal approximation. We repeat this over 10 evaluation seeds and report the median.</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEAM -->
+  <section class="block" id="team">
+    <div class="wrap">
+      <div class="sec-head"><span class="label">Team</span><h2>Authors</h2></div>
+      <p class="authors">[Author One]<sup>1*</sup>, [Author Two]<sup>1*</sup>, [Author Three]<sup>2</sup>, [Author Four]<sup>1,2</sup></p>
+      <div class="affils"><span><sup>1</sup> [Affiliation One]</span><span><sup>2</sup> [Affiliation Two]</span><span>* Equal contribution</span></div>
+    </div>
+  </section>
+
+  <!-- CITATION -->
+  <section class="block" id="cite">
+    <div class="wrap">
+      <div class="cite-head"><div class="sec-head" style="margin:0"><span class="label">Citation</span><h2>Cite this work</h2></div>
+        <button class="btn" id="copybib">Copy BibTeX</button></div>
+      <pre class="bib" id="bib">@article{fiveninesbench2026,
+  title   = {Five-Nines Bench: [Subtitle]},
+  author  = {[Author One] and [Author Two] and [Author Three]},
+  journal = {arXiv preprint arXiv:XXXX.XXXXX},
+  year    = {2026}
+}</pre>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><span>© 2026 Five-Nines Bench</span><span>[Contact or license line]</span></div></footer>
+
+<script src="data.js"></script>
+<script src="examples.js"></script>
+<script src="embed_map.js"></script>
+<script>
+(function () {
+  // ---------- LEADERBOARD DATA: window.LEADERBOARD from data.js (run build_data.py) ----------
+  var LB = window.LEADERBOARD || { categories: [], models: [] };
+  var BENCH = LB.categories;
+  var MODEL_COLORS = ["var(--c1)"];   // one hue for every model: bars carry their names
+  // Score = "nines" of safety, -log10(harm rate): 99.9% safe = 3 nines, five nines = 5.
+  function nines(p) { return -Math.log10(p); }
+  function safePct(p, digits) { return (100 * (1 - p)).toFixed(digits == null ? 4 : digits) + "%"; }
+  function perM(p) { var v = p * 1e6; return v >= 100 ? v.toFixed(0) : v.toFixed(1); }
+  var MODELS = LB.models.map(function (m, i) {
+    var done = m.scores.every(function (s) { return s; });
+    var overall = null;
+    if (done && m.scores.length) {
+      var mean = function (k) { return m.scores.reduce(function (a, s) { return a + s[k]; }, 0) / m.scores.length; };
+      overall = { p: mean("p"), lo: mean("lo"), hi: mean("hi"), sd: mean("sd"), overall: true };
+    }
+    return { name: m.name, scores: m.scores, overall: overall, color: MODEL_COLORS[i % MODEL_COLORS.length] };
+  });
+
+  var css = getComputedStyle(document.documentElement);
+  function tok(n) { return css.getPropertyValue(n).trim(); }
+  function $(id) { return document.getElementById(id); }
+  function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function press(btn, on) { btn.setAttribute("aria-pressed", on ? "true" : "false"); }
+  function scoreOf(m, k) { return k === "overall" ? m.overall : m.scores[k]; }
+
+  // ---------- leaderboard table ----------
+  var firstFilled = BENCH.findIndex(function (_, j) { return MODELS.some(function (m) { return m.scores[j]; }); });
+  var state = { sortKey: firstFilled < 0 ? 0 : firstFilled, dir: -1, open: {} };
+
+  function sortedModels(k, dir) {
+    return MODELS.slice().sort(function (a, b) {
+      var sa = scoreOf(a, k), sb = scoreOf(b, k);
+      if (!sa && !sb) return 0; if (!sa) return 1; if (!sb) return -1;   // no result yet: always last
+      return (nines(sa.p) - nines(sb.p)) * dir;
+    });
+  }
+  function heat(s, k) {
+    var vals = MODELS.map(function (m) { return scoreOf(m, k); }).filter(Boolean).map(function (x) { return nines(x.p); });
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), t = hi > lo ? (nines(s.p) - lo) / (hi - lo) : 0.5;
+    return "rgba(" + tok("--heat") + "," + (0.05 + t * 0.22).toFixed(3) + ")";
+  }
+  function cellHtml(s, k) {
+    if (!s) return '<td class="num">—</td>';
+    return '<td class="num" style="background:' + heat(s, k) + '" title="' + perM(s.p) + ' harmful per 1M responses">' +
+      safePct(s.p) + ' <span class="sd">' + nines(s.p).toFixed(2) + "</span></td>";
+  }
+
+  function renderTable() {
+    var cols = [{ k: "model", l: "Model", cls: "l" }, { k: "overall", l: "Overall" }]
+      .concat(BENCH.map(function (b, i) { return { k: i, l: b }; }));
+    $("lb-head").innerHTML = cols.map(function (c) {
+      var sortable = c.k !== "model";
+      var s = sortable && state.sortKey === c.k ? (state.dir < 0 ? "descending" : "ascending") : "none";
+      return '<th class="' + (c.cls || "") + '"' + (sortable ? ' data-k="' + c.k + '" aria-sort="' + s + '" tabindex="0"' : "") + ">" + c.l + "</th>";
+    }).join("");
+    var html = "";
+    sortedModels(state.sortKey, state.dir).forEach(function (m) {
+      var i = MODELS.indexOf(m), n = m.scores.filter(Boolean).length;
+      html += '<tr class="row" data-i="' + i + '" tabindex="0">' +
+        '<td class="l"><span class="method">' + esc(m.name) + "</span>" +
+        '<span class="badge">' + n + "/" + BENCH.length + "</span></td>" +
+        cellHtml(m.overall, "overall") + m.scores.map(function (s, j) { return cellHtml(s, j); }).join("") + "</tr>";
+      if (state.open[i]) {
+        html += '<tr class="detail"><td colspan="' + cols.length + '"><div class="detail-grid">' +
+          m.scores.map(function (s, j) {
+            return "<div><span class=\"label\">" + esc(BENCH[j]) + "</span><br>" + (!s ? "No result yet" :
+              '<span class="mono">' + perM(s.p) + " / 1M</span> harmful<br>" +
+              '<span class="mono">' + Math.round(LB.confidence * 100) + "% CI " + perM(s.lo) + "–" + perM(s.hi) + "</span><br>" +
+              '<span class="mono">' + s.seeds + " seeds · CE " + (s.ce_infer / 1000).toFixed(0) + "K + eval " + (s.q_infer / 1000).toFixed(0) + "K calls</span>") + "</div>";
+          }).join("") + "</div></td></tr>";
+      }
+    });
+    $("lb-body").innerHTML = html;
+  }
+
+  $("lb-head").addEventListener("click", sortHandler);
+  $("lb-head").addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sortHandler(e); } });
+  function sortHandler(e) {
+    var th = e.target.closest("th[data-k]"); if (!th) return;
+    var k = th.dataset.k === "overall" ? "overall" : +th.dataset.k;
+    if (state.sortKey === k) state.dir *= -1; else { state.sortKey = k; state.dir = -1; }
+    renderTable();
+  }
+  $("lb-body").addEventListener("click", toggleRow);
+  $("lb-body").addEventListener("keydown", function (e) { if (e.key === "Enter") toggleRow(e); });
+  function toggleRow(e) {
+    var tr = e.target.closest("tr.row"); if (!tr) return;
+    var i = tr.dataset.i; state.open[i] = !state.open[i]; renderTable();
+  }
+
+  var setupNote = "Estimated with importance sampling at " + (LB.eval_size / 1000) + "K eval samples, median over eval seeds" +
+    (LB.setup ? " (" + LB.setup + ")" : "") + ".";
+  $("lb-caption").textContent = "Safe response rate per harm category; the small number is nines of safety (−log₁₀ harm rate). " +
+    setupNote + " Shading is darker for safer models within each column. Click a row for harm counts and CIs; click a header to sort.";
+
+  // ---------- leaderboard bar chart ----------
+  // One bar per model for the selected category, in nines of safety. Whiskers are the
+  // seed-median CI, the dashed line is the five-nines target. Models without a result
+  // keep their slot as an outlined "no result yet" placeholder.
+  var lbMetric = state.sortKey;
+  $("lbc-metric").innerHTML = '<option value="overall">Overall</option>' +
+    BENCH.map(function (b, i) { return '<option value="' + i + '"' + (i === lbMetric ? " selected" : "") + ">" + esc(b) + "</option>"; }).join("");
+  $("lbc-metric").onchange = function () { lbMetric = this.value === "overall" ? "overall" : +this.value; renderLbChart(); };
+  $("lbc-key").innerHTML = '<span><i class="pending"></i>No result yet</span><span><i class="target"></i>Five nines (99.999%)</span>';
+  $("lbc-caption").textContent = "Bars: nines of safety. Error bars: " + Math.round(LB.confidence * 100) + "% CI. " + setupNote;
+
+  function renderLbChart() {
+    $("lbc-title").textContent = lbMetric === "overall" ? "Overall" : BENCH[lbMetric];
+    var data = sortedModels(lbMetric, -1).map(function (m) { return { m: m, s: scoreOf(m, lbMetric) }; });
+    var vmax = 6;
+    data.forEach(function (d) { if (d.s) vmax = Math.max(vmax, Math.ceil(nines(d.s.lo))); });
+    var narrow = $("lbc").clientWidth < 560, s = "", W, H;
+    var TICK = function (t) { return t === 0 ? "0%" : (100 - Math.pow(10, 2 - t)).toFixed(Math.max(0, t - 2)) + "%"; };
+    function tip(d) {
+      return "<title>" + esc(d.m.name) + ": " + (d.s ? safePct(d.s.p) + " safe, " + perM(d.s.p) + " harmful per 1M (" +
+        nines(d.s.p).toFixed(2) + " nines)" : "no result yet") + "</title>";
+    }
+    if (!narrow) {
+      W = 960; H = 360;
+      var L = 84, R = 70, T = 22, B = 46, pw = W - L - R, ph = H - T - B, step = pw / data.length, bw = Math.min(110, step * 0.6);
+      var sy = function (v) { return T + ph * (1 - v / vmax); };
+      for (var t = 0; t <= vmax; t++) {
+        s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + sy(t) + '" y2="' + sy(t) + '" stroke="var(--line)"/>' +
+             '<text x="' + (L - 8) + '" y="' + (sy(t) + 4) + '" text-anchor="end">' + TICK(t) + "</text>";
+      }
+      s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + sy(5) + '" y2="' + sy(5) + '" stroke="var(--fg)" stroke-dasharray="6 4" stroke-opacity=".7"/>' +
+           '<text x="' + (W - R + 6) + '" y="' + (sy(5) + 4) + '" class="tgt">five nines</text>';
+      data.forEach(function (d, i) {
+        var cx = L + step * (i + .5), x0 = cx - bw / 2;
+        s += '<g class="b">' + tip(d);
+        if (!d.s) {
+          s += '<rect x="' + x0 + '" y="' + sy(1.2) + '" width="' + bw + '" height="' + (sy(0) - sy(1.2)) + '" rx="3" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/>' +
+               '<text x="' + cx + '" y="' + (sy(0.6) + 4) + '" text-anchor="middle">no result yet</text>';
+        } else {
+          var y0 = sy(nines(d.s.p)), e1 = sy(nines(d.s.lo)), e2 = sy(nines(d.s.hi));
+          s += '<rect class="bar" x="' + x0 + '" y="' + y0 + '" width="' + bw + '" height="' + (sy(0) - y0) + '" rx="3" fill="' + d.m.color + '"/>' +
+               '<path d="M' + cx + " " + e1 + "V" + e2 + "M" + (cx - 6) + " " + e1 + "h12M" + (cx - 6) + " " + e2 + 'h12" stroke="var(--fg)" stroke-opacity=".6" stroke-width="1.5" fill="none"/>' +
+               '<text class="val out" x="' + cx + '" y="' + (e1 - 7) + '" text-anchor="middle">' + safePct(d.s.p, 3) + "</text>";
+        }
+        s += '<text x="' + cx + '" y="' + (sy(0) + 18) + '" text-anchor="middle">' + esc(d.m.name.replace(/ \(.*\)$/, "")) + "</text>" +
+             '<text x="' + cx + '" y="' + (sy(0) + 32) + '" text-anchor="middle">' + esc((d.m.name.match(/\((.*)\)$/) || ["", ""])[1]) + "</text></g>";
+      });
+    } else {
+      W = 400; var rowH = 44, T2 = 8, B2 = 24, L2 = 12, R2 = 64; H = T2 + B2 + rowH * data.length;
+      var pw2 = W - L2 - R2, sx = function (v) { return L2 + pw2 * v / vmax; };
+      for (var t2 = 0; t2 <= vmax; t2 += 2) {
+        s += '<line x1="' + sx(t2) + '" x2="' + sx(t2) + '" y1="' + T2 + '" y2="' + (H - B2) + '" stroke="var(--line)"/>' +
+             '<text x="' + sx(t2) + '" y="' + (H - 6) + '" text-anchor="middle">' + TICK(t2) + "</text>";
+      }
+      s += '<line x1="' + sx(5) + '" x2="' + sx(5) + '" y1="' + T2 + '" y2="' + (H - B2) + '" stroke="var(--fg)" stroke-dasharray="5 3" stroke-opacity=".7"/>';
+      data.forEach(function (d, i) {
+        var y = T2 + rowH * i, cy = y + 30, bh = 12;
+        s += '<g class="b">' + tip(d) + '<text x="' + L2 + '" y="' + (y + 13) + '">' + esc(d.m.name) + "</text>";
+        if (!d.s) {
+          s += '<rect x="' + L2 + '" y="' + (cy - bh / 2) + '" width="' + (sx(1.5) - L2) + '" height="' + bh + '" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/>' +
+               '<text x="' + (sx(1.5) + 6) + '" y="' + (cy + 4) + '">no result yet</text>';
+        } else {
+          var a1 = sx(nines(d.s.hi)), a2 = sx(nines(d.s.lo));
+          s += '<rect class="bar" x="' + L2 + '" y="' + (cy - bh / 2) + '" width="' + (sx(nines(d.s.p)) - L2) + '" height="' + bh + '" rx="2" fill="' + d.m.color + '"/>' +
+               '<path d="M' + a1 + " " + cy + "H" + a2 + "M" + a1 + " " + (cy - 5) + "v10M" + a2 + " " + (cy - 5) + 'v10" stroke="var(--fg)" stroke-opacity=".6" stroke-width="1.2" fill="none"/>' +
+               '<text class="val out" x="' + (a2 + 5) + '" y="' + (cy + 4) + '">' + safePct(d.s.p, 3) + "</text>";
+        }
+        s += "</g>";
+      });
+    }
+    $("lbc").innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Bar chart of safe response rate by model for ' +
+      esc(lbMetric === "overall" ? "all categories" : BENCH[lbMetric]) + '">' + s + "</svg>";
+  }
+  var lbcW = 0;
+  window.addEventListener("resize", function () { var w = $("lbc").clientWidth; if ((w < 560) !== (lbcW < 560)) renderLbChart(); lbcW = w; });
+
+  // ---------- sampling efficiency ----------
+  // Per model, two bars on a linear axis: naive Monte Carlo (uniform draws whose exact binomial
+  // CI matches our CI width) vs ours (CE training + eval calls). Label = the ratio.
+  var effCat = state.sortKey === "overall" ? 0 : state.sortKey;
+  $("eff-cat").innerHTML = BENCH.map(function (b, i) { return '<option value="' + i + '"' + (i === effCat ? " selected" : "") + ">" + esc(b) + "</option>"; }).join("");
+  $("eff-cat").onchange = function () { effCat = +this.value; renderEff(); };
+  $("eff-key").innerHTML = '<span><i style="background:var(--mc)"></i>Naive Monte Carlo</span>' +
+    '<span><i style="background:var(--accent)"></i>Ours (CE training + eval)</span><span><i class="pending"></i>No result yet</span>';
+  $("eff-caption").textContent = "Responses needed to reach the same " + Math.round(LB.confidence * 100) +
+    "% CI width. Ours includes the calls spent training the proposal. " + setupNote;
+  function fmtN(n) { return n >= 1e6 ? +(n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : +(n / 1e3).toFixed(0) + "K"; }
+
+  function renderEff() {
+    $("eff-title").textContent = BENCH[effCat];
+    var data = MODELS.map(function (m) { return { m: m, s: m.scores[effCat] }; });
+    data.sort(function (a, b) { if (!a.s && !b.s) return 0; if (!a.s) return 1; if (!b.s) return -1;
+      return b.s.mc_n / (b.s.ce_infer + b.s.q_infer) - a.s.mc_n / (a.s.ce_infer + a.s.q_infer); });
+    // Linear axis from 0 with a 1-2-5 tick step, sized to this category's largest bar.
+    var top = 1e5;
+    data.forEach(function (d) { if (d.s) top = Math.max(top, d.s.mc_n, d.s.ce_infer + d.s.q_infer); });
+    var mag = Math.pow(10, Math.floor(Math.log10(top / 5))), tstep = [1, 2, 5, 10].map(function (m) { return m * mag; })
+      .filter(function (v) { return top / v <= 6; })[0];
+    var vmax = Math.ceil(top * 1.08 / tstep) * tstep, ticks = [];
+    for (var tv = 0; tv <= vmax + 1e-9; tv += tstep) ticks.push(tv);
+    var narrow = $("eff").clientWidth < 560, s = "", W, H;
+    function lab(v) { return v === 0 ? "0" : fmtN(v); }
+    function tip(d) {
+      if (!d.s) return "<title>" + esc(d.m.name) + ": no result yet</title>";
+      var ours = d.s.ce_infer + d.s.q_infer;
+      return "<title>" + esc(d.m.name) + "\nNaive MC: " + d.s.mc_n.toLocaleString() + " responses\nOurs: " + ours.toLocaleString() +
+        " (CE " + d.s.ce_infer.toLocaleString() + " + eval " + d.s.q_infer.toLocaleString() + ")\n" + (d.s.mc_n / ours).toFixed(1) + "× fewer</title>";
+    }
+    if (!narrow) {
+      W = 960; H = 360;
+      var L = 60, R = 16, T = 30, B = 46, pw = W - L - R, ph = H - T - B, step = pw / data.length, bw = Math.min(56, step * 0.3);
+      var sy = function (n) { return T + ph * (1 - n / vmax); };
+      ticks.forEach(function (v) {
+        s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + sy(v) + '" y2="' + sy(v) + '" stroke="var(--line)"/>' +
+             '<text x="' + (L - 8) + '" y="' + (sy(v) + 4) + '" text-anchor="end">' + lab(v) + "</text>";
+      });
+      var base = sy(0);
+      data.forEach(function (d, i) {
+        var cx = L + step * (i + .5);
+        s += '<g class="b">' + tip(d);
+        if (!d.s) {
+          s += '<rect x="' + (cx - bw - 3) + '" y="' + (base - 60) + '" width="' + (2 * bw + 6) + '" height="60" rx="3" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/>' +
+               '<text x="' + cx + '" y="' + (base - 26) + '" text-anchor="middle">no result yet</text>';
+        } else {
+          var ours = d.s.ce_infer + d.s.q_infer, ym = sy(d.s.mc_n), yo = sy(ours);
+          s += '<rect class="bar" x="' + (cx - bw - 3) + '" y="' + ym + '" width="' + bw + '" height="' + (base - ym) + '" rx="3" fill="var(--mc)"/>' +
+               '<rect class="bar" x="' + (cx + 3) + '" y="' + yo + '" width="' + bw + '" height="' + (base - yo) + '" rx="3" fill="' + d.m.color + '"/>' +
+               '<text class="val out" x="' + (cx - bw / 2 - 3) + '" y="' + (ym - 6) + '" text-anchor="middle">' + fmtN(d.s.mc_n) + "</text>" +
+               '<text class="val out" x="' + (cx + bw / 2 + 3) + '" y="' + (yo - 6) + '" text-anchor="middle">' + fmtN(ours) + "</text>" +
+               '<text class="gain" x="' + cx + '" y="' + (ym - 22) + '" text-anchor="middle">' + (d.s.mc_n / ours).toFixed(1) + "× fewer</text>";
+        }
+        s += '<text x="' + cx + '" y="' + (base + 18) + '" text-anchor="middle">' + esc(d.m.name.replace(/ \(.*\)$/, "")) + "</text>" +
+             '<text x="' + cx + '" y="' + (base + 32) + '" text-anchor="middle">' + esc((d.m.name.match(/\((.*)\)$/) || ["", ""])[1]) + "</text></g>";
+      });
+    } else {
+      W = 400; var rowH = 58, T2 = 8, B2 = 24, L2 = 12, R2 = 96; H = T2 + B2 + rowH * data.length;
+      var sx = function (n) { return L2 + (W - L2 - R2) * n / vmax; };
+      ticks.filter(function (_, i) { return i % 2 === 0; }).forEach(function (v) {
+        s += '<line x1="' + sx(v) + '" x2="' + sx(v) + '" y1="' + T2 + '" y2="' + (H - B2) + '" stroke="var(--line)"/>' +
+             '<text x="' + sx(v) + '" y="' + (H - 6) + '" text-anchor="middle">' + lab(v) + "</text>";
+      });
+      data.forEach(function (d, i) {
+        var y = T2 + rowH * i;
+        s += '<g class="b">' + tip(d) + '<text x="' + L2 + '" y="' + (y + 13) + '">' + esc(d.m.name) + "</text>";
+        if (!d.s) {
+          s += '<rect x="' + L2 + '" y="' + (y + 20) + '" width="80" height="26" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/>' +
+               '<text x="' + (L2 + 88) + '" y="' + (y + 37) + '">no result yet</text>';
+        } else {
+          var o = d.s.ce_infer + d.s.q_infer;
+          s += '<rect class="bar" x="' + L2 + '" y="' + (y + 20) + '" width="' + (sx(d.s.mc_n) - L2) + '" height="11" rx="2" fill="var(--mc)"/>' +
+               '<rect class="bar" x="' + L2 + '" y="' + (y + 35) + '" width="' + (sx(o) - L2) + '" height="11" rx="2" fill="' + d.m.color + '"/>' +
+               '<text class="val out" x="' + (sx(d.s.mc_n) + 5) + '" y="' + (y + 30) + '">' + fmtN(d.s.mc_n) + "</text>" +
+               '<text class="val out" x="' + (sx(o) + 5) + '" y="' + (y + 45) + '">' + fmtN(o) + ' · <tspan class="gain">' + (d.s.mc_n / o).toFixed(1) + "×</tspan></text>";
+        }
+        s += "</g>";
+      });
+    }
+    $("eff").innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Responses needed by naive Monte Carlo and by our method, per model, for ' + esc(BENCH[effCat]) + '">' + s + "</svg>";
+  }
+  window.addEventListener("resize", function () { renderEff(); });
+
+  // ---------- examples ----------
+  // Strip: every judged-harmful eval draw's w on a log axis (mode on the left, tail on the
+  // right), numbered markers for the hand-picked examples in examples.js; cards below in w order.
+  var EX = window.EXAMPLES || {};
+  function rng(seed) { return function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
+  var exModels = MODELS.filter(function (m) { return EX[m.name]; });
+  var ex = { model: exModels.length ? exModels[0].name : null, cat: null };
+  function exCats(name) { return BENCH.filter(function (c) { return EX[name] && EX[name][c]; }); }
+  function renderExControls() {
+    $("ex-models").innerHTML = MODELS.map(function (m) {
+      var has = !!EX[m.name];
+      return '<option value="' + esc(m.name) + '"' + (m.name === ex.model ? " selected" : "") + (has ? "" : " disabled") + ">" +
+        esc(m.name.replace(/ \(.*\)$/, "")) + (has ? "" : " (no examples yet)") + "</option>";
+    }).join("");
+    var cats = exCats(ex.model);
+    if (cats.indexOf(ex.cat) < 0) ex.cat = cats[0] || null;
+    $("ex-cat").innerHTML = cats.map(function (c) { return "<option" + (c === ex.cat ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("");
+  }
+  $("ex-models").onchange = function () { ex.model = this.value; renderExControls(); renderEx(); };
+  $("ex-cat").onchange = function () { ex.cat = this.value; renderEx(); };
+
+  function renderEx() {
+    if (!ex.model || !ex.cat) { $("ex-strip").innerHTML = ""; $("ex-list").innerHTML = '<li class="ex-empty">No examples yet.</li>'; return; }
+    var m = MODELS.filter(function (x) { return x.name === ex.model; })[0];
+    var all = (LB.models[MODELS.indexOf(m)].positive_w || [])[BENCH.indexOf(ex.cat)] || [];
+    var items = EX[ex.model][ex.cat].slice().sort(function (a, b) { return a.w - b.w; });
+    $("ex-title").textContent = ex.model + " · " + ex.cat;
+    var ws = all.concat(items.map(function (d) { return d.w; }));
+    var lo = Math.floor(Math.log10(Math.min.apply(null, ws))), hi = Math.ceil(Math.log10(Math.max.apply(null, ws)));
+    var MAP = window.EMBED_MAP, mp = MAP && MAP.pos[ex.model] && MAP.pos[ex.model][ex.cat];
+    if (mp) {
+      // color scale spans the data exactly (decade ticks inside it), so both ends are used
+      lo = Math.log10(Math.min.apply(null, mp.map(function (d) { return d[3]; })));
+      hi = Math.log10(Math.max.apply(null, mp.map(function (d) { return d[3]; })));
+      drawMap();
+    } else drawHist();
+    $("ex-caption").innerHTML = mp
+      ? "Each dot is a prompt, placed by its meaning (" + (MAP.method === "tsne" ? "t-SNE" : "PCA") + " of Qwen3-Embedding-8B embeddings). " +
+        "Grey: a random sample of WildChat prompts. Colored: prompts that got a judged-harmful response, by <b>importance weight</b> " +
+        "= baseline sampling probability ÷ our sampling probability. Numbered markers are the examples below."
+      : "How many judged-harmful responses from the eval draws (all seeds) fall at each <b>importance weight</b> = baseline sampling " +
+        "probability ÷ our sampling probability, i.e. how much each one counts in the estimate. Numbered markers are the examples below.";
+
+    // 2D embedding map: grey background sample of WildChat, harmful prompts colored from
+    // low w (light) to high w (dark), one hue; rare ones drawn on top.
+    function drawMap() {
+      var narrow = $("ex-strip").clientWidth < 560, W = narrow ? 400 : 960, H = narrow ? 380 : 470;
+      var L = 8, R = 8, T = 8, B = 70, base = H - B;
+      var px = function (v) { return L + (W - L - R) * v / 1000; }, py = function (v) { return T + (base - 12 - T) * v / 1000; };
+      var hex = function (n) { var h = css.getPropertyValue(n).trim().replace("#", ""); return [0, 2, 4].map(function (k) { return parseInt(h.substr(k, 2), 16); }); };
+      var stops = [hex("--seq1"), hex("--seq2"), hex("--seq3")];
+      var col = function (w) {
+        var t = Math.max(0, Math.min(1, (Math.log10(w) - lo) / (hi - lo))) * 2, k = Math.min(1, Math.floor(t)), f = t - k;
+        return "rgb(" + [0, 1, 2].map(function (j) { return Math.round(stops[k][j] + (stops[k + 1][j] - stops[k][j]) * f); }).join(",") + ")";
+      };
+      var g = narrow ? 1.6 : 2, s = '<path fill="var(--mc)" opacity=".55" d="';
+      for (var i = 0; i < MAP.bg.length; i += 2) s += "M" + px(MAP.bg[i]).toFixed(1) + " " + py(MAP.bg[i + 1]).toFixed(1) + "h" + g + "v" + g + "h-" + g + "z";
+      s += '"/>';
+      var r = narrow ? 2.2 : 2.8, at = {};
+      mp.forEach(function (d) {
+        at[d[0]] = d;
+        s += '<circle cx="' + px(d[1]).toFixed(1) + '" cy="' + py(d[2]).toFixed(1) + '" r="' + r + '" fill="' + col(d[3]) + '"><title>importance weight ' + d[3] + "</title></circle>";
+      });
+      var placed = [];
+      items.forEach(function (d, i) {
+        var p = at[d.idx]; if (!p) return;
+        var x0 = px(p[1]), y0 = py(p[2]), x = x0, y = y0;
+        // markers that would overlap an earlier one move up, with a leader line to the true point
+        while (placed.some(function (q) { return Math.abs(q[0] - x) < 20 && Math.abs(q[1] - y) < 20; })) y -= 22;
+        placed.push([x, y]);
+        if (y !== y0) s += '<line x1="' + x0 + '" y1="' + y0 + '" x2="' + x + '" y2="' + y + '" stroke="var(--fg)" stroke-width="1.2"/>' +
+          '<circle cx="' + x0 + '" cy="' + y0 + '" r="2.5" fill="var(--fg)"/>';
+        s += '<circle cx="' + x + '" cy="' + y + '" r="9" fill="var(--fg)" stroke="var(--surface)" stroke-width="2"><title>#' + (i + 1) + " · importance weight " + d.w + "</title></circle>" +
+             '<text class="ex-num" x="' + x + '" y="' + (y + 3.5) + '" text-anchor="middle">' + (i + 1) + "</text>";
+      });
+      // legend: color bar over importance weight (log), with the two ends named
+      var bx0 = L + 40, bx1 = W - R - 40, by = base + 22, bsx = function (w) { return bx0 + (bx1 - bx0) * (Math.log10(w) - lo) / (hi - lo); };
+      s += '<defs><linearGradient id="exgrad"><stop offset="0" stop-color="' + col(Math.pow(10, lo)) + '"/><stop offset=".5" stop-color="' + col(Math.pow(10, (lo + hi) / 2)) +
+           '"/><stop offset="1" stop-color="' + col(Math.pow(10, hi)) + '"/></linearGradient></defs>' +
+           '<rect x="' + bx0 + '" y="' + by + '" width="' + (bx1 - bx0) + '" height="8" rx="2" fill="url(#exgrad)"/>' +
+           '<text class="end" x="' + bx0 + '" y="' + (by - 6) + '">← Low weight</text>' +
+           '<text class="end" x="' + bx1 + '" y="' + (by - 6) + '" text-anchor="end">High weight →</text>';
+      for (var e = Math.ceil(lo); e <= Math.floor(hi); e++) s += '<text x="' + bsx(Math.pow(10, e)) + '" y="' + (by + 22) + '" text-anchor="middle">' + (+Math.pow(10, e).toFixed(Math.max(0, -e))) + "</text>";
+      s += '<text x="' + ((bx0 + bx1) / 2) + '" y="' + (H - 2) + '" text-anchor="middle">importance weight (log scale)</text>';
+      $("ex-strip").innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="2D map of prompt embeddings, harmful prompts colored by importance weight, for ' +
+        esc(ex.model + " " + ex.cat) + '">' + s + "</svg>";
+    }
+
+    function drawHist() {
+    // Histogram of log10(w): bins per decade, linear count axis. Markers for the examples sit
+    // above the plot with a guide line down to the w they fall at.
+    var narrow = $("ex-strip").clientWidth < 560, W = narrow ? 400 : 960, H = 260, L = 46, R = 16, T = 58, base = H - 34;
+    var perDecade = narrow ? 5 : 10, nb = (hi - lo) * perDecade, counts = [];
+    for (var k = 0; k < nb; k++) counts.push(0);
+    all.forEach(function (w) { var k = Math.floor((Math.log10(w) - lo) * perDecade); counts[Math.min(nb - 1, Math.max(0, k))]++; });
+    var cmax = Math.max.apply(null, counts.concat([1]));
+    var mag = Math.pow(10, Math.floor(Math.log10(cmax / 4 || 1))), tstep = [1, 2, 5, 10].map(function (m) { return m * mag; })
+      .filter(function (v) { return cmax / v <= 5; })[0] || mag * 10;
+    var ymax = Math.ceil(cmax / tstep) * tstep;
+    var sx = function (w) { return L + (W - L - R) * (Math.log10(w) - lo) / (hi - lo); };
+    var sy = function (c) { return base - (base - T) * c / ymax; };
+    var s = "";
+    for (var tv = 0; tv <= ymax; tv += tstep) {
+      s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + sy(tv) + '" y2="' + sy(tv) + '" stroke="var(--line)"/>' +
+           '<text x="' + (L - 6) + '" y="' + (sy(tv) + 4) + '" text-anchor="end">' + tv + "</text>";
+    }
+    var bwid = (W - L - R) / nb;
+    counts.forEach(function (c, k) {
+      if (!c) return;
+      var x0 = L + k * bwid, y0 = Math.min(sy(c), base - 2);
+      s += '<rect x="' + (x0 + 0.5).toFixed(1) + '" y="' + y0.toFixed(1) + '" width="' + Math.max(1, bwid - 1).toFixed(1) + '" height="' + (base - y0).toFixed(1) +
+        '" fill="var(--mc)"><title>' + c + " responses with importance weight " + (+Math.pow(10, lo + k / perDecade).toPrecision(2)) + "–" + (+Math.pow(10, lo + (k + 1) / perDecade).toPrecision(2)) + "</title></rect>";
+    });
+    for (var e = lo; e <= hi; e++) {
+      s += '<text x="' + sx(Math.pow(10, e)) + '" y="' + (base + 16) + '" text-anchor="middle">' + (+Math.pow(10, e).toFixed(Math.max(0, -e))) + "</text>";
+    }
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + base + '" y2="' + base + '" stroke="var(--muted)"/>' +
+         '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 2) + '" text-anchor="middle">importance weight (log scale)</text>' +
+         '<text x="12" y="' + ((T + base) / 2) + '" text-anchor="middle" transform="rotate(-90 12 ' + ((T + base) / 2) + ')"># responses</text>' +
+         '<text class="end" x="' + L + '" y="16">← Low weight</text>' +
+         '<text class="end" x="' + (W - R) + '" y="16" text-anchor="end">High weight →</text>';
+    items.forEach(function (d, i) {
+      var x = sx(d.w), y = 34 + (i % 2) * 12;
+      s += '<line x1="' + x + '" x2="' + x + '" y1="' + (y + 9) + '" y2="' + base + '" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 2"/>' +
+           '<circle cx="' + x + '" cy="' + y + '" r="9" fill="var(--accent)"><title>#' + (i + 1) + " · importance weight " + d.w + "</title></circle>" +
+           '<text class="ex-num" x="' + x + '" y="' + (y + 3.5) + '" text-anchor="middle">' + (i + 1) + "</text>";
+    });
+    $("ex-strip").innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Distribution of importance weights for ' + esc(ex.model + " " + ex.cat) + ' harmful responses, log scale">' + s + "</svg>";
+    }
+
+    function ord(n) { var t = n % 100, u = n % 10; return n + (t >= 11 && t <= 13 ? "th" : u === 1 ? "st" : u === 2 ? "nd" : u === 3 ? "rd" : "th"); }
+    function pct(w) { var k = 0; all.forEach(function (v) { if (v <= w) k++; }); return all.length ? Math.round(100 * k / all.length) : null; }
+    $("ex-list").innerHTML = items.map(function (d, i) {
+      var zone = i === 0 ? '<span class="ex-zone mode">Lowest weight</span>' : i === items.length - 1 ? '<span class="ex-zone tail">Highest weight</span>' : "";
+      var p = pct(d.w);
+      return '<li class="ex"><span class="ex-n">' + (i + 1) + '</span>' +
+        '<div class="ex-head"><span class="ex-pattern">' + esc(d.pattern) + "</span>" + zone +
+        '<span class="ex-meta">importance weight ' + d.w.toFixed(3) + (p === null ? "" : " · " + ord(p) + " percentile") + " · " + esc(d.lang) + " · WildChat #" + d.idx + "</span></div>" +
+        '<p><span class="k">Prompt</span>' + esc(d.prompt) + "</p>" +
+        '<p><span class="k">Model</span>' + esc(d.finding) + "</p></li>";
+    }).join("");
+  }
+  window.addEventListener("resize", function () { renderEx(); });
+
+  $("copybib").onclick = function () {
+    var btn = this, text = $("bib").textContent;
+    function done(msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = "Copy BibTeX"; }, 1500); }
+    function fallback() { var rg = document.createRange(); rg.selectNodeContents($("bib")); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); done("Selected — press ⌘C"); }
+    try { navigator.clipboard.writeText(text).then(function () { done("Copied"); }, fallback); } catch (e) { fallback(); }
+  };
+
+  renderTable(); renderLbChart(); renderEff(); renderExControls(); renderEx(); lbcW = $("lbc").clientWidth;
+  if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { css = getComputedStyle(document.documentElement); renderTable(); });
+})();
+</script>
+</body>
+</html>
