@@ -25,6 +25,9 @@
   --c1: #9b3a43;
   --mc: #c9cacc;             /* naive Monte Carlo bars: light Steel Gray */
   --seq1: #d59aa0; --seq2: #b4545c; --seq3: #7a2830;   /* one-hue ramp, low -> high */
+  --q0: #fbf3f3; --q4: #4a1219;   /* sampling map: the same hue stretched toward surface and ink */
+  /* map failure types: validated 8-slot categorical palette, fixed order */
+  --g1: #2a78d6; --g2: #eb6834; --g3: #1baf7a; --g4: #eda100; --g5: #e87ba4; --g6: #008300; --g7: #6250d6; --g8: #e34948;
   --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
   --font-body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
@@ -33,14 +36,16 @@
   :root:not([data-theme="light"]) {
     --bg: #141414; --surface: #1d1d1d; --fg: #ececec; --muted: #a7a8aa; --line: #333333;
     --accent: #cf6f76; --accent-soft: #33221f; --heat: 207, 111, 118; --warn: #fdb515;
-    --c1: #cf6f76; --mc: #4f5155; --seq1: #7a3a40; --seq2: #b8626a; --seq3: #f0b3b7;
+    --c1: #cf6f76; --mc: #4f5155; --seq1: #7a3a40; --seq2: #b8626a; --seq3: #f0b3b7; --q0: #241b1c; --q4: #ffe4e6;
+    --g1: #3987e5; --g2: #d95926; --g3: #199e70; --g4: #c98500; --g5: #d55181; --g6: #008300; --g7: #9085e9; --g8: #e66767;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #141414; --surface: #1d1d1d; --fg: #ececec; --muted: #a7a8aa; --line: #333333;
   --accent: #cf6f76; --accent-soft: #33221f; --heat: 207, 111, 118; --warn: #fdb515;
-  --c1: #cf6f76; --mc: #4f5155; --seq1: #7a3a40; --seq2: #b8626a; --seq3: #f0b3b7;
+  --c1: #cf6f76; --mc: #4f5155; --seq1: #7a3a40; --seq2: #b8626a; --seq3: #f0b3b7; --q0: #241b1c; --q4: #ffe4e6;
+    --g1: #3987e5; --g2: #d95926; --g3: #199e70; --g4: #c98500; --g5: #d55181; --g6: #008300; --g7: #9085e9; --g8: #e66767;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -169,6 +174,31 @@ tr.detail td { text-align: left; background: var(--bg); white-space: normal; }
 .ex .k { font: 500 .7rem var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 6px; }
 .seg button:disabled { opacity: .45; cursor: not-allowed; }
 .ex-empty { color: var(--muted); font-size: .9rem; padding: 20px 0; }
+.seg[hidden] { display: none; }
+.ex-none { color: var(--muted); font-style: italic; }
+.ex-n.ex-dot { width: 12px; height: 12px; margin: 5px 7px 0; }
+.emap-wrap { position: relative; }
+.emap circle.p { transition: opacity .12s; }
+.emap.dim circle.p { opacity: .12; }
+.emap.dim circle.p.on { opacity: 1; stroke: var(--fg); stroke-width: 1.2; }
+.emap-tip { position: absolute; z-index: 5; width: 280px; max-width: calc(100% - 8px); pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .12); font-size: .8rem; line-height: 1.35; }
+.tip-g { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--fg); }
+.tip-g i, .emap-leg i { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block; }
+.tip-s { margin-top: 3px; color: var(--fg); }
+.tip-note { color: var(--muted); font-style: italic; }
+.emap-leg .chip.note { color: var(--muted); margin-top: 6px; }
+.emap-leg i.ring { background: transparent; border: 1.5px solid var(--muted); box-sizing: border-box; }
+.tip-m { margin-top: 4px; font: .7rem var(--font-mono); color: var(--muted); }
+.emap-grid { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 12px; align-items: center; }
+.emap-grid.narrow { grid-template-columns: minmax(0, 1fr); }
+.emap-wleg { width: 100%; max-width: 170px; height: auto; display: block; margin: 0 auto; }
+.emap-grid.narrow .emap-wleg { max-width: none; }
+.emap-leg { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.emap-grid.narrow .emap-leg { flex-direction: row; flex-wrap: wrap; gap: 4px 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.emap-leg .chip { display: inline-flex; align-items: center; gap: 6px; text-align: left; font-size: .8rem; color: var(--fg); padding: 2px 8px; border: 1px solid transparent; border-radius: 99px; cursor: default; }
+.emap-leg .chip b { font: 400 .7rem var(--font-mono); color: var(--muted); }
+.emap-leg .chip:hover { border-color: var(--line); background: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .emap circle.p { transition: none; } }
 
 /* flow */
 .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; counter-reset: step; }
@@ -319,7 +349,8 @@ footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wr
         </div>
       </div>
       <div class="chart lb-chart">
-        <div class="chart-head"><h3 id="ex-title">Where the examples sit</h3></div>
+        <div class="chart-head"><h3 id="ex-title">Where the examples sit</h3>
+          <div class="seg" id="ex-colorby" role="group" aria-label="Color dots by" hidden><button type="button" data-v="group">Failure type</button><button type="button" data-v="q">Sampling (Q)</button></div></div>
         <div id="ex-strip"></div>
         <p class="caption" id="ex-caption" style="margin:4px 0 0"></p>
       </div>
@@ -678,12 +709,15 @@ footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wr
   // right), numbered markers for the hand-picked examples in examples.js; cards below in w order.
   var EX = window.EXAMPLES || {};
   function rng(seed) { return function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
-  var exModels = MODELS.filter(function (m) { return EX[m.name]; });
+  // a panel exists when there are examples or map dots for it (some categories are map-only)
+  var MAPD = window.EMBED_MAP || { pos: {} };
+  var hasEx = function (name, c) { return !!((EX[name] && EX[name][c]) || (MAPD.pos[name] && MAPD.pos[name][c])); };
+  var exModels = MODELS.filter(function (m) { return BENCH.some(function (c) { return hasEx(m.name, c); }); });
   var ex = { model: exModels.length ? exModels[0].name : null, cat: null };
-  function exCats(name) { return BENCH.filter(function (c) { return EX[name] && EX[name][c]; }); }
+  function exCats(name) { return BENCH.filter(function (c) { return hasEx(name, c); }); }
   function renderExControls() {
     $("ex-models").innerHTML = MODELS.map(function (m) {
-      var has = !!EX[m.name];
+      var has = exCats(m.name).length > 0;
       return '<option value="' + esc(m.name) + '"' + (m.name === ex.model ? " selected" : "") + (has ? "" : " disabled") + ">" +
         esc(m.name.replace(/ \(.*\)$/, "")) + (has ? "" : " (no examples yet)") + "</option>";
     }).join("");
@@ -693,72 +727,239 @@ footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wr
   }
   $("ex-models").onchange = function () { ex.model = this.value; renderExControls(); renderEx(); };
   $("ex-cat").onchange = function () { ex.cat = this.value; renderEx(); };
+  [].forEach.call($("ex-colorby").querySelectorAll("button"), function (b) { b.onclick = function () { ex.colorBy = b.dataset.v; renderEx(); }; });
 
   function renderEx() {
     if (!ex.model || !ex.cat) { $("ex-strip").innerHTML = ""; $("ex-list").innerHTML = '<li class="ex-empty">No examples yet.</li>'; return; }
     var m = MODELS.filter(function (x) { return x.name === ex.model; })[0];
     var all = (LB.models[MODELS.indexOf(m)].positive_w || [])[BENCH.indexOf(ex.cat)] || [];
-    var items = EX[ex.model][ex.cat].slice().sort(function (a, b) { return a.w - b.w; });
+    var items = ((EX[ex.model] && EX[ex.model][ex.cat]) || []).slice().sort(function (a, b) { return a.w - b.w; });
     $("ex-title").textContent = ex.model + " · " + ex.cat;
     var ws = all.concat(items.map(function (d) { return d.w; }));
     var lo = Math.floor(Math.log10(Math.min.apply(null, ws))), hi = Math.ceil(Math.log10(Math.max.apply(null, ws)));
     var MAP = window.EMBED_MAP, mp = MAP && MAP.pos[ex.model] && MAP.pos[ex.model][ex.cat];
+    // numbers-only categories (child sexual exploitation): dots, weights and Q, nothing else
+    var numOnly = !!(MAP && MAP.numbers_only && (MAP.numbers_only[ex.model] || []).indexOf(ex.cat) >= 0);
+    // failure-type view: one card per group (its most typical prompt, largest group first)
+    // instead of the hand-picked examples, which belong to the importance-weight view
+    var names = (mp && MAP.groups && MAP.groups[ex.model] && MAP.groups[ex.model][ex.cat]) || null;
+    var reps = names && MAP.rep && MAP.rep[ex.model] && MAP.rep[ex.model][ex.cat];
+    // views: failure type (default when groups exist), importance weight, sampling distribution Q
+    var qb = (mp && MAP.qbg && MAP.qbg[ex.model] && MAP.qbg[ex.model][ex.cat]) || null;
+    // two views: failure type and sampling distribution; a panel with neither falls back to
+    // coloring the dots by importance weight (no toggle)
+    var view = ex.colorBy || (reps ? "group" : qb ? "q" : "weight");
+    if ((view === "group" && !reps) || (view === "q" && !qb) || view === "weight") view = reps ? "group" : qb ? "q" : "weight";
+    var byGroup = view === "group", byQ = view === "q";
+    // in the failure-type view, high-weight dots are drawn hollow: same kind of failure, but where
+    // our sampler rarely looked, so they sit apart from the colored clusters and count for more
+    var HOLLOW = 0.8, hollow = function (w) { return byGroup && w > HOLLOW; };
+    var gcol = function (k) { return "var(--g" + (k % 8 + 1) + ")"; };
+    var summ = function (i) { var t = MAP && MAP.summary && MAP.summary[ex.model]; t = t && t[ex.cat]; return (t && t[i]) || ""; };
+    if (byGroup) {
+      var cnt = names.map(function () { return 0; }), wOf = {};
+      mp.forEach(function (d) { cnt[d[4]]++; wOf[d[0]] = d[3]; });
+      items = names.map(function (nm, k) { return { idx: reps[k], w: wOf[reps[k]], g: k, pattern: nm, n: cnt[k] }; })
+        .sort(function (a, b) { return b.n - a.n; });
+    }
     if (mp) {
       // color scale spans the data exactly (decade ticks inside it), so both ends are used
       lo = Math.log10(Math.min.apply(null, mp.map(function (d) { return d[3]; })));
       hi = Math.log10(Math.max.apply(null, mp.map(function (d) { return d[3]; })));
       drawMap();
-    } else drawHist();
-    $("ex-caption").innerHTML = mp
-      ? "Each dot is a prompt, placed by its meaning (" + (MAP.method === "tsne" ? "t-SNE" : "PCA") + " of Qwen3-Embedding-8B embeddings). " +
-        "Grey: a random sample of WildChat prompts. Colored: prompts that got a judged-harmful response, by <b>importance weight</b> " +
-        "= baseline sampling probability ÷ our sampling probability. Numbered markers are the examples below."
-      : "How many judged-harmful responses from the eval draws (all seeds) fall at each <b>importance weight</b> = baseline sampling " +
+    } else { $("ex-colorby").hidden = true; drawHist(); }
+    if (!mp) $("ex-caption").innerHTML = "How many judged-harmful responses from the eval draws (all seeds) fall at each <b>importance weight</b> = baseline sampling " +
         "probability ÷ our sampling probability, i.e. how much each one counts in the estimate. Numbered markers are the examples below.";
 
-    // 2D embedding map: grey background sample of WildChat, harmful prompts colored from
-    // low w (light) to high w (dark), one hue; rare ones drawn on top.
+    // 2D embedding map: grey background sample of WildChat; harmful prompts colored by failure
+    // type (groups from build_map_labels.py) or by importance weight on one hue, low -> high.
+    // Hovering a dot shows its group, its one-line prompt summary and its weight; hovering a
+    // group in the legend lights up that group.
     function drawMap() {
-      var narrow = $("ex-strip").clientWidth < 560, W = narrow ? 400 : 960, H = narrow ? 380 : 470;
-      var L = 8, R = 8, T = 8, B = 70, base = H - B;
-      var px = function (v) { return L + (W - L - R) * v / 1000; }, py = function (v) { return T + (base - 12 - T) * v / 1000; };
+      $("ex-colorby").hidden = !(reps && qb);
+      [].forEach.call($("ex-colorby").querySelectorAll("button"), function (b) {
+        b.hidden = (b.dataset.v === "group" && !reps) || (b.dataset.v === "q" && !qb);
+        b.setAttribute("aria-pressed", String(b.dataset.v === view));
+      });
+      // the map is drawn the same in both modes; only the legend in the side column changes
+      var narrow = $("ex-strip").clientWidth < 560, W = narrow ? 400 : 760, H = narrow ? 320 : 400;
+      var L = 8, R = 8, T = 8, B = 8, base = H - B;
+      var px = function (v) { return L + (W - R - L) * v / 1000; }, py = function (v) { return T + (base - T) * v / 1000; };
       var hex = function (n) { var h = css.getPropertyValue(n).trim().replace("#", ""); return [0, 2, 4].map(function (k) { return parseInt(h.substr(k, 2), 16); }); };
       var stops = [hex("--seq1"), hex("--seq2"), hex("--seq3")];
       var col = function (w) {
         var t = Math.max(0, Math.min(1, (Math.log10(w) - lo) / (hi - lo))) * 2, k = Math.min(1, Math.floor(t)), f = t - k;
         return "rgb(" + [0, 1, 2].map(function (j) { return Math.round(stops[k][j] + (stops[k + 1][j] - stops[k][j]) * f); }).join(",") + ")";
       };
-      var g = narrow ? 1.6 : 2, s = '<path fill="var(--mc)" opacity=".55" d="';
+      var s = "", qlo = 0, qhi = 1;
+      var qstops = [hex("--q0"), hex("--seq1"), hex("--seq2"), hex("--seq3"), hex("--q4")];
+      var qcol = function (t) {  // t in [0, 1]: the weights' hue, stretched from near-surface to near-ink
+        t = Math.max(0, Math.min(1, t)) * 4; var k = Math.min(3, Math.floor(t)), f = t - k;
+        return "rgb(" + [0, 1, 2].map(function (j) { return Math.round(qstops[k][j] + (qstops[k + 1][j] - qstops[k][j]) * f); }).join(",") + ")";
+      };
+      if (byQ) {
+        // Our sampling distribution Q as a smooth field: every dot on the map (grey background
+        // and harmful alike) carries its exact N * Q(x) from the run's q_cache, and the field is
+        // a Gaussian-kernel average of log10(N * Q) over nearby dots (Nadaraya-Watson), drawn as
+        // an image under the dots. Far from any dot it is left blank rather than guessed.
+        var pts = [], k2;
+        for (k2 = 0; k2 < qb.bg.length; k2++) pts.push([MAP.bg[2 * k2], MAP.bg[2 * k2 + 1], qb.bg[k2]]);
+        mp.forEach(function (d, j) { pts.push([d[1], d[2], qb.pos[j]]); });
+        var GW = narrow ? 160 : 300, GH = Math.round(GW * (base - T) / (W - R - L)), sig = 14;  // sig in map units (of 1000)
+        var sx = GW / 1000, sy = GH / 1000, rx = Math.ceil(3 * sig * sx), ry = Math.ceil(3 * sig * sy);
+        var num = new Float64Array(GW * GH), den = new Float64Array(GW * GH);
+        pts.forEach(function (t) {
+          var v = Math.log10(Math.max(t[2], 1e-4)), cx = t[0] * sx, cy = t[1] * sy, x0 = Math.floor(cx), y0 = Math.floor(cy);
+          for (var yy = Math.max(0, y0 - ry); yy <= Math.min(GH - 1, y0 + ry); yy++)
+            for (var xx = Math.max(0, x0 - rx); xx <= Math.min(GW - 1, x0 + rx); xx++) {
+              var dx = (xx + .5 - cx) / sx, dy = (yy + .5 - cy) / sy, kw = Math.exp(-(dx * dx + dy * dy) / (2 * sig * sig));
+              num[yy * GW + xx] += kw * v; den[yy * GW + xx] += kw;
+            }
+        });
+        // color range from the field over the covered map area (the dots bunch up where Q is high)
+        var vals = [];
+        for (k2 = 0; k2 < GW * GH; k2++) if (den[k2] >= .35) vals.push(num[k2] / den[k2]);
+        vals.sort(function (a, b) { return a - b; });
+        qlo = vals[Math.floor(vals.length * .02)]; qhi = vals[Math.floor(vals.length * .995)];
+        var cv = document.createElement("canvas"); cv.width = GW; cv.height = GH;
+        var cx2 = cv.getContext("2d"), img = cx2.createImageData(GW, GH);
+        for (k2 = 0; k2 < GW * GH; k2++) {
+          if (den[k2] < .35) continue;  // under ~a third of one dot's weight nearby: no data, leave blank
+          var rgb = qcol((num[k2] / den[k2] - qlo) / (qhi - qlo)).match(/\d+/g);
+          img.data[4 * k2] = +rgb[0]; img.data[4 * k2 + 1] = +rgb[1]; img.data[4 * k2 + 2] = +rgb[2];
+          img.data[4 * k2 + 3] = Math.round(255 * Math.min(1, den[k2] / 1.2));  // fade out toward the empty edges
+        }
+        cx2.putImageData(img, 0, 0);
+        s += '<image href="' + cv.toDataURL() + '" x="' + L + '" y="' + T + '" width="' + (W - R - L) + '" height="' + (base - T) + '" preserveAspectRatio="none"/>';
+      }
+      var g = narrow ? 1.6 : 2;
+      s += '<path fill="var(--mc)" opacity="' + (byQ ? ".35" : ".55") + '" d="';
       for (var i = 0; i < MAP.bg.length; i += 2) s += "M" + px(MAP.bg[i]).toFixed(1) + " " + py(MAP.bg[i + 1]).toFixed(1) + "h" + g + "v" + g + "h-" + g + "z";
       s += '"/>';
       var r = narrow ? 2.2 : 2.8, at = {};
       mp.forEach(function (d) {
         at[d[0]] = d;
-        s += '<circle cx="' + px(d[1]).toFixed(1) + '" cy="' + py(d[2]).toFixed(1) + '" r="' + r + '" fill="' + col(d[3]) + '"><title>importance weight ' + d[3] + "</title></circle>";
+        s += '<circle class="p" cx="' + px(d[1]).toFixed(1) + '" cy="' + py(d[2]).toFixed(1) + '" r="' + (hollow(d[3]) ? r + .6 : r) + '" ' +
+          (hollow(d[3]) ? 'fill="var(--surface)" stroke="' + gcol(d[4]) + '" stroke-width="1.5"' : byQ ? 'fill="var(--fg)" stroke="var(--surface)" stroke-width=".8"' : 'fill="' + (byGroup ? gcol(d[4]) : col(d[3])) + '"') + "/>";
       });
       var placed = [];
-      items.forEach(function (d, i) {
+      if (!byGroup) items.forEach(function (d, i) {  // numbered markers: weight view only
         var p = at[d.idx]; if (!p) return;
-        var x0 = px(p[1]), y0 = py(p[2]), x = x0, y = y0;
+        // failure-type view: the marker stands off its dot, so it doesn't hide a small, tight group
+        var x0 = px(p[1]), y0 = py(p[2]), x = byGroup ? x0 + 16 : x0, y = byGroup ? y0 - 16 : y0;
         // markers that would overlap an earlier one move up, with a leader line to the true point
         while (placed.some(function (q) { return Math.abs(q[0] - x) < 20 && Math.abs(q[1] - y) < 20; })) y -= 22;
         placed.push([x, y]);
-        if (y !== y0) s += '<line x1="' + x0 + '" y1="' + y0 + '" x2="' + x + '" y2="' + y + '" stroke="var(--fg)" stroke-width="1.2"/>' +
-          '<circle cx="' + x0 + '" cy="' + y0 + '" r="2.5" fill="var(--fg)"/>';
-        s += '<circle cx="' + x + '" cy="' + y + '" r="9" fill="var(--fg)" stroke="var(--surface)" stroke-width="2"><title>#' + (i + 1) + " · importance weight " + d.w + "</title></circle>" +
+        if (x !== x0 || y !== y0) s += '<line x1="' + (byGroup ? x0 + 4 : x0) + '" y1="' + (byGroup ? y0 - 4 : y0) + '" x2="' + x + '" y2="' + y + '" stroke="var(--fg)" stroke-width="1.2"/>' +
+          (byGroup ? "" : '<circle cx="' + x0 + '" cy="' + y0 + '" r="2.5" fill="var(--fg)"/>');  // keep the group's own dot visible
+        s += '<circle cx="' + x + '" cy="' + y + '" r="9" fill="var(--fg)" stroke="var(--surface)" stroke-width="2"><title>#' + (i + 1) + (byGroup ? " · " + d.pattern : " · importance weight " + d.w) + "</title></circle>" +
              '<text class="ex-num" x="' + x + '" y="' + (y + 3.5) + '" text-anchor="middle">' + (i + 1) + "</text>";
       });
-      // legend: color bar over importance weight (log), with the two ends named
-      var bx0 = L + 40, bx1 = W - R - 40, by = base + 22, bsx = function (w) { return bx0 + (bx1 - bx0) * (Math.log10(w) - lo) / (hi - lo); };
-      s += '<defs><linearGradient id="exgrad"><stop offset="0" stop-color="' + col(Math.pow(10, lo)) + '"/><stop offset=".5" stop-color="' + col(Math.pow(10, (lo + hi) / 2)) +
-           '"/><stop offset="1" stop-color="' + col(Math.pow(10, hi)) + '"/></linearGradient></defs>' +
-           '<rect x="' + bx0 + '" y="' + by + '" width="' + (bx1 - bx0) + '" height="8" rx="2" fill="url(#exgrad)"/>' +
-           '<text class="end" x="' + bx0 + '" y="' + (by - 6) + '">← Low weight</text>' +
-           '<text class="end" x="' + bx1 + '" y="' + (by - 6) + '" text-anchor="end">High weight →</text>';
-      for (var e = Math.ceil(lo); e <= Math.floor(hi); e++) s += '<text x="' + bsx(Math.pow(10, e)) + '" y="' + (by + 22) + '" text-anchor="middle">' + (+Math.pow(10, e).toFixed(Math.max(0, -e))) + "</text>";
-      s += '<text x="' + ((bx0 + bx1) / 2) + '" y="' + (H - 2) + '" text-anchor="middle">importance weight (log scale)</text>';
-      $("ex-strip").innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="2D map of prompt embeddings, harmful prompts colored by importance weight, for ' +
-        esc(ex.model + " " + ex.cat) + '">' + s + "</svg>";
+      var leg = "", grad = function (v) {
+        return '<defs><linearGradient id="exgrad"' + (v ? ' x1="0" y1="1" x2="0" y2="0"' : "") + '><stop offset="0" stop-color="' + col(Math.pow(10, lo)) + '"/><stop offset=".5" stop-color="' +
+          col(Math.pow(10, (lo + hi) / 2)) + '"/><stop offset="1" stop-color="' + col(Math.pow(10, hi)) + '"/></linearGradient></defs>';
+      };
+      if (byQ) {
+        // decade ticks of N * Q: x1 is the rate real traffic would sample at
+        var qticks = function (pos, x) {
+          var out = "";
+          for (var e = Math.ceil(qlo); e <= Math.floor(qhi); e++)
+            out += '<text x="' + x + '" y="' + (pos(e) + 4) + '"' + (e === 0 ? ' class="tgt"' : "") + ">×" + (+Math.pow(10, e).toFixed(Math.max(0, -e))) + "</text>";
+          return out;
+        };
+        var qs = '<defs><linearGradient id="qgrad" x1="0" y1="1" x2="0" y2="0">' + [0, .25, .5, .75, 1].map(function (o) {
+                   return '<stop offset="' + o + '" stop-color="' + qcol(o) + '"/>'; }).join("") + "</linearGradient></defs>";
+        if (!narrow) {
+          var qyT = 46, qyB = 230, qbc = 62;
+          qs += '<rect x="' + (qbc - 5) + '" y="' + qyT + '" width="10" height="' + (qyB - qyT) + '" rx="2" fill="url(#qgrad)"/>' +
+                '<text class="end" x="' + qbc + '" y="' + (qyT - 26) + '" text-anchor="middle"><tspan x="' + qbc + '">Sampled</tspan><tspan x="' + qbc + '" dy="16">more</tspan></text>' +
+                '<text class="end" x="' + qbc + '" y="' + (qyB + 20) + '" text-anchor="middle"><tspan x="' + qbc + '">Sampled</tspan><tspan x="' + qbc + '" dy="16">less</tspan></text>' +
+                qticks(function (e) { return qyB - (qyB - qyT) * (e - qlo) / (qhi - qlo); }, qbc + 11) +
+                '<text transform="translate(162,' + ((qyT + qyB) / 2) + ') rotate(-90)" text-anchor="middle">Q vs. real traffic (×1 = same rate)</text>' +
+                '<rect x="20" y="292" width="5" height="5" fill="var(--mc)"/><text x="32" y="298">real traffic (P)</text>' +
+                '<circle cx="22.5" cy="314" r="2.8" fill="var(--fg)"/><text x="32" y="318">judged harmful</text>';
+          leg = '<svg class="emap-wleg" viewBox="0 0 170 330" aria-hidden="true">' + qs + "</svg>";
+        } else {
+          qs += '<rect x="40" y="26" width="320" height="8" rx="2" fill="url(#qgrad)"/>' +
+                '<text class="end" x="40" y="18">← Sampled less</text><text class="end" x="360" y="18" text-anchor="end">Sampled more →</text>' +
+                '<rect x="40" y="46" width="5" height="5" fill="var(--mc)"/><text x="50" y="52">real traffic (P)</text>' +
+                '<circle cx="182" cy="48.5" r="2.8" fill="var(--fg)"/><text x="190" y="52">judged harmful</text>';
+          leg = '<svg class="emap-wleg" viewBox="0 0 400 58" aria-hidden="true">' + qs + "</svg>";
+        }
+      } else if (!byGroup && !narrow) {
+        // legend: vertical color bar over importance weight (log), high at the top
+        var lw = 170, lh = 330, bc = 62, yT = 46, yB = lh - 46, bsy = function (w) { return yB - (yB - yT) * (Math.log10(w) - lo) / (hi - lo); };
+        var two = function (y, a, b) { return '<text class="end" x="' + bc + '" y="' + y + '" text-anchor="middle"><tspan x="' + bc + '">' + a + '</tspan><tspan x="' + bc + '" dy="16">' + b + "</tspan></text>"; };
+        var ls = grad(true) + '<rect x="' + (bc - 5) + '" y="' + yT + '" width="10" height="' + (yB - yT) + '" rx="2" fill="url(#exgrad)"/>' +
+             two(yT - 26, "High", "weight") + two(yB + 20, "Low", "weight");
+        for (var e = Math.ceil(lo); e <= Math.floor(hi); e++) ls += '<text x="' + (bc + 11) + '" y="' + (bsy(Math.pow(10, e)) + 4) + '">' + (+Math.pow(10, e).toFixed(Math.max(0, -e))) + "</text>";
+        ls += '<text transform="translate(' + (lw - 8) + "," + ((yT + yB) / 2) + ') rotate(-90)" text-anchor="middle">importance weight (log scale)</text>';
+        leg = '<svg class="emap-wleg" viewBox="0 0 ' + lw + " " + lh + '" aria-hidden="true">' + ls + "</svg>";
+      } else if (!byGroup) {
+        // phone: the same scale, horizontal, under the map
+        var bx0 = 40, bx1 = 360, bsx = function (w) { return bx0 + (bx1 - bx0) * (Math.log10(w) - lo) / (hi - lo); };
+        var hs = grad(false) + '<rect x="' + bx0 + '" y="26" width="' + (bx1 - bx0) + '" height="8" rx="2" fill="url(#exgrad)"/>' +
+             '<text class="end" x="' + bx0 + '" y="18">← Low weight</text><text class="end" x="' + bx1 + '" y="18" text-anchor="end">High weight →</text>';
+        for (var e2 = Math.ceil(lo); e2 <= Math.floor(hi); e2++) hs += '<text x="' + bsx(Math.pow(10, e2)) + '" y="50" text-anchor="middle">' + (+Math.pow(10, e2).toFixed(Math.max(0, -e2))) + "</text>";
+        leg = '<svg class="emap-wleg" viewBox="0 0 400 58" aria-hidden="true">' + hs + "</svg>";
+      } else {
+        // legend: one chip per failure type, largest first
+        var cnt = names.map(function () { return 0; });
+        mp.forEach(function (d) { cnt[d[4]]++; });
+        leg = '<div class="emap-leg">' + names.map(function (nm, k) { return k; }).sort(function (a, b) { return cnt[b] - cnt[a]; }).map(function (k) {
+          return '<span class="chip" data-g="' + k + '"><i style="background:' + gcol(k) + '"></i>' + esc(names[k]) + " <b>" + cnt[k] + "</b></span>";
+        }).join("") + (mp.some(function (d) { return hollow(d[3]); }) ? '<span class="chip note"><i class="ring"></i>Importance weight &gt; ' + HOLLOW + "</span>" : "") + "</div>";
+      }
+      $("ex-strip").innerHTML = '<div class="emap-grid' + (narrow ? " narrow" : "") + '"><div class="emap-wrap"><svg class="emap" viewBox="0 0 ' + W + " " + H +
+        '" role="img" aria-label="2D map of prompt embeddings, harmful prompts colored by ' + (byGroup ? "failure type" : "importance weight") + ", for " +
+        esc(ex.model + " " + ex.cat) + '">' + s + '</svg><div class="emap-tip" hidden></div></div><div class="emap-side">' + leg + "</div></div>";
+      $("ex-caption").innerHTML = "Each dot is a prompt, placed by its meaning (" + (MAP.method === "tsne" ? "t-SNE" : "PCA") + " of Qwen3-Embedding-8B embeddings). " +
+        (byQ ? "Grey: a random sample of real WildChat traffic (P). Shading: our sampling distribution Q, as how often it picks the prompts at each spot compared " +
+               "with real traffic (×1 = same rate), smoothed over the dots nearby (each dot's Q is exact). Dark dots: prompts that got a judged-harmful response. Q piles up where failures are, which is why " +
+               "failures there get low importance weights, and the few found outside it count for more: a failure's importance weight is the inverse of " +
+               "the shading under it (darker, lower weight). " :
+        "Grey: a random sample of WildChat prompts. Colored: prompts that got a judged-harmful response, ") +
+        (byQ ? "" : byGroup ? "by <b>failure type</b>: groups of similar prompts, named by an LLM. Hollow rings are failures with importance weight above " + HOLLOW +
+                   ": a similar failure where our sampler rarely looked, so they count for more and often sit apart from the clusters. "
+                 : "by <b>importance weight</b> = baseline sampling probability ÷ our sampling probability. ") +
+        (numOnly ? "For child sexual exploitation the map shows where failures fall and nothing else: no prompts, summaries, groups or " +
+                   "WildChat IDs, and its prompts sit at their nearest mapped prompt instead of being part of the map's fit. " : "") +
+        (numOnly ? "" : "Hover a dot for a short summary." + (byGroup ? " Below: the most typical prompt of each group." : " Numbered markers are the examples below."));
+
+      var wrap = $("ex-strip").querySelector(".emap-wrap"), svg = wrap.querySelector("svg"), tip = wrap.querySelector(".emap-tip");
+      var dots = svg.querySelectorAll("circle.p"), cur = -1;
+      function mark(f) { [].forEach.call(dots, function (c, j) { c.classList.toggle("on", !!f && f(mp[j], j)); }); svg.classList.toggle("dim", !!f); }
+      function show(j, ev) {
+        if (j < 0) { tip.hidden = true; if (cur >= 0) { dots[cur].setAttribute("r", r); mark(null); } cur = -1; return; }
+        if (j !== cur) {
+          if (cur >= 0) dots[cur].setAttribute("r", r);
+          cur = j; dots[j].setAttribute("r", r * 1.8); mark(function (d, k) { return k === j; });
+          var d = mp[j], sm = summ(d[0]);
+          tip.innerHTML = numOnly ? '<div class="tip-m">importance weight ' + d[3] + "</div>" : (names ? '<div class="tip-g"><i style="background:' + gcol(d[4]) + '"></i>' + esc(names[d[4]]) + "</div>" : "") +
+            (sm ? '<div class="tip-s">' + esc(sm) + "</div>" : "") +
+            (hollow(d[3]) ? '<div class="tip-s tip-note">High importance weight: a similar failure where our sampler rarely looked, so it counts more.</div>' : "") +
+            '<div class="tip-m">importance weight ' + d[3] + " · " + esc(ex.model) + "</div>";
+          tip.hidden = false;
+        }
+        // beside the cursor, flipped to stay inside the chart
+        var b = wrap.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top;
+        tip.style.left = Math.max(4, x + 14 + tip.offsetWidth <= b.width - 4 ? x + 14 : x - 14 - tip.offsetWidth) + "px";
+        tip.style.top = (y > b.height / 2 ? y - 10 - tip.offsetHeight : y + 14) + "px";
+      }
+      // nearest dot within ~10 map units of the cursor, so tiny dots are still easy to hit
+      svg.addEventListener("mousemove", function (ev) {
+        var pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+        var q = pt.matrixTransform(svg.getScreenCTM().inverse()), best = -1, bd = 100;
+        mp.forEach(function (d, j) { var dx = px(d[1]) - q.x, dy = py(d[2]) - q.y; if (dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = j; } });
+        show(best, ev);
+      });
+      svg.addEventListener("mouseleave", function () { show(-1); });
+      ex.mark = function (k) { mark(k == null ? null : function (d) { return d[4] === k; }); };
+      [].forEach.call($("ex-strip").querySelectorAll(".emap-leg .chip"), function (c) {
+        var k = +c.dataset.g;
+        c.addEventListener("mouseenter", function () { mark(function (d) { return d[4] === k; }); });
+        c.addEventListener("mouseleave", function () { mark(null); });
+      });
     }
 
     function drawHist() {
@@ -805,6 +1006,25 @@ footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wr
 
     function ord(n) { var t = n % 100, u = n % 10; return n + (t >= 11 && t <= 13 ? "th" : u === 1 ? "st" : u === 2 ? "nd" : u === 3 ? "rd" : "th"); }
     function pct(w) { var k = 0; all.forEach(function (v) { if (v <= w) k++; }); return all.length ? Math.round(100 * k / all.length) : null; }
+    if (numOnly) {
+      $("ex-list").innerHTML = '<li class="ex-empty">No examples are shown for this category: the map above shows only where its failures fall.</li>';
+      return;
+    }
+    if (byGroup) {
+      $("ex-list").innerHTML = items.map(function (d, i) {
+        var sm = summ(d.idx);
+        return '<li class="ex" data-g="' + d.g + '"><span class="ex-n ex-dot" style="background:' + gcol(d.g) + '"></span>' +
+          '<div class="ex-head"><span class="ex-pattern">' + esc(d.pattern) + "</span>" +
+          '<span class="ex-meta">' + d.n + " prompts · importance weight " + (+d.w).toFixed(3) + " · WildChat #" + d.idx + "</span></div>" +
+          '<p><span class="k">Typical</span>' + (sm ? esc(sm) : '<span class="ex-none">summary coming soon</span>') + "</p></li>";
+      }).join("");
+      // hovering a card lights up its group on the map
+      [].forEach.call($("ex-list").querySelectorAll(".ex"), function (li) {
+        li.addEventListener("mouseenter", function () { if (ex.mark) ex.mark(+li.dataset.g); });
+        li.addEventListener("mouseleave", function () { if (ex.mark) ex.mark(null); });
+      });
+      return;
+    }
     $("ex-list").innerHTML = items.map(function (d, i) {
       var zone = i === 0 ? '<span class="ex-zone mode">Lowest weight</span>' : i === items.length - 1 ? '<span class="ex-zone tail">Highest weight</span>' : "";
       var p = pct(d.w);
